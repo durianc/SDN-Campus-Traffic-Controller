@@ -3,8 +3,8 @@ import random
 import time
 import numpy as np
 import get_topo
-import CountMinSketch
-import TopK
+import count_minsketch
+import topK
 import subprocess
 
 app = Flask(__name__)
