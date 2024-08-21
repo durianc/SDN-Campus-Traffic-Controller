@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<html lang="en">
+<head>
+    <style>
+        /* 设置按钮的样式 */
+        button {
+            background-color: #4CAF50; /* 背景颜色 */
+            border: none; /* 无边框 */
+            color: white; /* 文字颜色 */
+            padding: 15px 32px; /* 内边距 */
+            text-align: center; /* 文字居中 */
+            text-decoration: none; /* 无下划线 */
+            display: inline-block; /* 行内块级元素 */
+            font-size: 16px; /* 字体大小 */
+            margin: 4px 2px; /* 外边距 */
+            cursor: pointer; /* 鼠标悬停时变为手形 */
+            border-radius: 12px; /* 圆角 */
+            justify-content: center; /* 水平居中 */
+        }
+
+        /* 设置按钮悬停时的样式 */
+        button:hover {
+            background-color: #45a049;
+        }
+        #outputBox {
+            display: flex; /* 使用flex布局 */
+            background-color: #f2f2f2; /* 背景颜色 */
+            border: 1px solid #ccc; /* 边框 */
+            padding: 10px; /* 内边距 */
+            font-family: Arial, sans-serif; /* 字体 */
+            font-size: 16px; /* 字体大小 */
+            color: #333; /* 文字颜色 */
+            width: 600px; /* 宽度 */
+            height: 400px; /* 调整高度，这里假设为400px */
+            overflow: auto; /* 如果内容超出容器，显示滚动条 */
+            margin: 10px; /* 外边距 */
+            justify-content: center; /* 水平居中 */
+            align-items: center; /* 垂直居中 */
+        }
+
+        @media (max-width: 768px) {
+            #outputBox {
+                width: 100%; /* 在小屏幕上以100%宽度显示 */
+                height: 300px; /* 调整高度 */
+            }
+        }
+        /* 设置 <select> 元素的大小 */
+                 select {
+                 width: 120px; /* 宽度 */
+                 height: 35px; /* 高度 */
+                 position: absolute; /* 使用绝对定位 */
+                 top: 150px; /* 距离顶部的距离 */
+                 left: 750px; /* 距离左侧的距离 */
+                 }
+        /* 设置 <input> 元素的大小 */
+                 #kInput {
+                 width: 120px; /* 宽度 */
+                 height: 30px; /* 高度 */
+                 position: absolute; /* 使用绝对定位 */
+                 top: 150px; /* 距离顶部的距离 */
+                 left: 880px; /* 距离左侧的距离 */
+                 }
+    </style>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园SDN网络管理平台</title>
+
+</head>
+<body>
+<div style="display: flex; justify-content: center; align-items: center;" ng-app="app.topology" ng-controller="TopologyCtrl">
+    <h1>校园SDN网络管理平台</h1>
+</div>
+<div style="display: flex; justify-content: center; align-items: center;" ng-app="app.topology" ng-controller="TopologyCtrl">
+    <button id="createTopologyButton">创建拓扑</button>
+    <button id="getTopologyButton">获取拓扑</button>
+    <button id="flowStatisticsButton">流量统计</button>
+    <button id="flowAnalysisButton">流量分析</button>
+</div>
+<br>
+<br>
+<div>
+    <select id="fileSelect">
+    <option value="packet1">1</option>
+    <option value="packet2">2</option>
+    <option value="packet3">3</option>
+    </select>
+    <input type="number" id="kInput" placeholder="输入k值">
+</div>
+<div style="display: flex; justify-content: center; align-items: center;" ng-app="app.topology" ng-controller="TopologyCtrl">
+<div id="outputBox">输出框</div>
+    <topology-simple topology="topology"></topology-simple>
+
+</div>
+
+
+
+	<script>
+
+
+
+        var createTopologyButton = document.getElementById('createTopologyButton');
+
+        // 为按钮添加点击事件处理器
+        createTopologyButton.addEventListener('click', function() {
+          // 使用fetch API来发送POST请求
+          fetch('/api/create-topology', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  file: './topo2.py',
+                  controller: {
+                      ip: '127.0.0.1',
+                      port: 6633
+                  }
+              })
+          })
+          .then(response => {
+              if (response.ok) {
+                  console.log('拓扑创建成功');
+              } else {
+                  console.log('拓扑创建失败');
+              }
+          });
+        });
+
+        var getTopologyButton = document.getElementById('getTopologyButton');
+
+        // 为按钮添加点击事件处理器
+        getTopologyButton.addEventListener('click', function() {
+            // 使用fetch API来发送GET请求
+            fetch('/api/topology')
+                .then(response => response.json())
+                .then(topology => {
+                    console.log(topology); // 打印出从后端返回的拓扑数据，用于调试
+                    const {nodes, links} = parseTopologyData(topology);
+                    // 将拓扑数据转换成 D3.js 需要的格式
+                    renderTopology(nodes, links); // 解析并渲染拓扑数据
+                })
+                .catch(error => {
+                    console.error('获取拓扑数据时发生错误: ', error);
+                });
+        });
+
+		var flowButton = document.getElementById('flowStatisticsButton');
+		flowButton.addEventListener('click', function() {
+		//outputBox.textContent=test
+		    var selectedFile = document.getElementById('fileSelect').value;  // 获取选项值
+            var url = '/api/countmin?file=' + selectedFile;  // 构建带有选项值的 URL
+		    fetch(url)
+		        .then(response => response.json())
+		        .then(data => {
+		            // 这里，data对象包含了从后端返回的数据
+		            outputBox.textContent = JSON.stringify(data, null, 2);
+
+		            // 你可以用它来进行展示或其他操作
+		            console.log(data);
+		        });
+
+		});
+
+		var flowAnalysisButton = document.getElementById('flowAnalysisButton');
+        flowAnalysisButton.addEventListener('click', function() {
+            var selectedFile = document.getElementById('fileSelect').value;  // 获取选项值
+            var selectedKValue = document.getElementById('kInput').value;  // 获取输入框中的 k 值
+            var url = '/api/topk?k=' + selectedKValue + '&file=' + selectedFile;  // 构建带有选项值和 k 值的 URL
+            fetch(url)  // 将k值作为查询参数传递给后端
+                .then(response => response.json())
+                .then(data => {
+                    // 这里，data对象包含了从后端返回的Top-k流量分析结果
+                    outputBox.textContent = JSON.stringify(data, null, 2);
+
+                    // 你可以用它来进行展示或其他操作
+                    console.log(data);
+                });
+        });
+
+        // 解析拓扑数据，转换成D3需要的节点和连接的格式
+        function parseTopologyData(topologyData) {
+            const nodes = [];
+            const links = [];
+
+            // 收集所有节点
+            topologyData["network-topology"]["topology"][0]["node"].forEach(node => {
+                const nodeId = node["node-id"];
+                const nodeType = getNodeTypeInfo(nodeId); // Detect node type
+                nodes.push({ id: nodeId, type: nodeType });
+            });
+
+            // 收集所有连接
+            topologyData["network-topology"]["topology"][0]["link"].forEach(link => {
+                const sourceNode = link.source["source-node"];
+                const destNode = link.destination["dest-node"];
+                links.push({ source: sourceNode, target: destNode });
+            });
+
+            // 返回节点和连接
+            return { nodes, links };
+        }
+
+        function getNodeTypeInfo(nodeId) {
+            if (nodeId.startsWith("openflow:")) {
+                return "switch";  // Assume node ID starts with "openflow:" is a switch
+            } else {
+                return "host";  // Otherwise, it's a host
+            }
+        }
+
+        function renderTopology(nodes, links) {
+
+            // 定义画布的宽度和高度
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const center_x = width / 2;
+            const center_y = height / 2;
+            // 清空现有的拓扑图
+            d3.select("svg").remove();
+
+            // 创建 SVG 元素，并设置宽度和高度
+            const svg = d3.select("body").append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .attr("viewBox", [-250, -100, width, height]);
+                
+
+            // 创建连线
+            const lines = svg.selectAll("line")
+                .data(links)
+                .enter().append("line")
+                .style("stroke", "#ccc")
+                .style("stroke-width", 2);
+
+            // 创建节点
+            const shapes = svg.selectAll(".node")
+                .data(nodes)
+                .enter().append("g")
+                .attr("class", "node")
+                .attr("transform", d => "translate(" + d.x + "," + d.y + ")");
+
+            // 添加椭圆形和长方形
+            shapes.each(function(d) {
+                const node = d3.select(this);
+                if (d.type === "switch") {
+                    node.select("ellipse") // 选择现有的椭圆形
+                        .attr("rx", 20)
+                        .attr("ry", 10)
+                        .attr("fill", "lightblue");
+                    node.select("rect").remove(); // 删除可能存在的长方形
+                    node.append("ellipse"); // 添加椭圆形
+                } else {
+                    node.select("rect") // 选择现有的长方形
+                        .attr("x", -20)
+                        .attr("y", -10)
+                        .attr("width", 20)
+                        .attr("height", 40)
+                        .attr("fill", "lightgreen");
+                    node.select("ellipse").remove(); // 删除可能存在的椭圆形
+                    node.append("rect"); // 添加长方形
+                }
+            });
+
+            // 基于传入的节点和连接信息来布局拓扑
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id))
+                .force("charge", d3.forceManyBody().strength(-1000))//斥力
+                .force("center", d3.forceCenter(center_x / 2, center_y / 2))
+                .on("tick", ticked);
+
+            function ticked() {
+                lines
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                shapes.attr("transform", d => `translate(${d.x},${d.y})`); // 更新节点位置
+
+                // 添加椭圆形
+                shapes.each(function(d) {
+                    const node = d3.select(this);
+                    if (d.type === "switch") {
+                        node.select("ellipse") // 选择现有的椭圆形
+                            .attr("cx", 0)
+                            .attr("cy", 0)
+                            .attr("rx", 20)
+                            .attr("ry", 10)
+                            .attr("fill", "lightblue");
+                        node.select("rect").remove(); // 删除可能存在的长方形
+                        node.select("circle").remove(); // 删除可能存在的圆形
+                        node.append("ellipse"); // 添加椭圆形
+                    } else {
+                        node.select("rect") // 选择现有的长方形
+                            .attr("x", -20)
+                            .attr("y", -10)
+                            .attr("width", 20)
+                            .attr("height", 40)
+                            .attr("fill", "lightgreen");
+                        node.select("ellipse").remove(); // 删除可能存在的椭圆形
+                        node.select("circle").remove(); // 删除可能存在的圆形
+                        node.append("rect"); // 添加长方形
+                    }
+                });
+                // 添加节点文本
+                shapes.append("text")
+                    .attr("dy", -25) // 偏移量，使文本位于图形上方
+                    .attr("text-anchor", "middle")
+                    .text(d => d.id); // 根据节点的id设置文本内容
+
+                // 处理鼠标悬停事件
+                shapes.on("mouseover", function(d) {
+                    if (d.type === "switch") {
+                        // 在鼠标悬停在交换机节点上时，显示节点 id
+                        d3.select(this).select("text").text(d.id)
+                            .attr("dx", 40)
+                            .attr("dy", -40)
+                            .attr("text-anchor", "middle")
+                            .style("font-size", "18px");
+                    }
+                    else{
+                        d3.select(this).select("text").text(d.id)
+                            .attr("dx", 40)
+                            .attr("dy", -40)
+                            .attr("text-anchor", "middle")
+                            .style("font-size", "18px");
+                    }
+                    // const ip = d.ip; // 获取节点对应的IP地址
+                    // d3.select(this).select("text").text(d.id + "\n" + ip) // 在鼠标悬停时显示节点id和IP地址
+                    //     .attr("dy", -40) // 调整位置
+                    //     .attr("text-anchor", "middle")
+                    //     .style("font-size", "18px");
+                })
+                    .on("mouseout", function(d) {
+                        d3.select(this).select("text").text(d.id) // 鼠标移出时恢复显示节点id
+                            .attr("dy", -25)
+                            .attr("text-anchor", "middle")
+                            .style("font-size", "14px");
+                    });
+                // 更新连线的位置
+                lines
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+            }
+        }
+	</script>
+</body>
+</html>
+
+
+
+
